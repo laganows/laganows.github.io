@@ -23,6 +23,17 @@ var score1 = 0,
     score2 = 0,
     maxScore = 7;
 
+// hitting ball sound
+var snd = new Audio("./sounds/hittingBall.mp3");
+
+// background music
+backgroundMusic = new Audio('./sounds/backgroundMusic.mp3');
+backgroundMusic.addEventListener('ended', function() {
+    this.currentTime = 0;
+    this.play();
+}, false);
+backgroundMusic.play();
+
 function setup() {
     document.getElementById("winnerBoard").innerHTML = "First to " + maxScore + "wins!";
 
@@ -33,13 +44,23 @@ function setup() {
     draw();
 }
 
+
+function createMesh(geom, imageFile) {
+    var texture = THREE.ImageUtils.loadTexture("textures/" + imageFile)
+    var mat = new THREE.MeshPhongMaterial();
+    mat.map = texture;
+
+    var mesh = new THREE.Mesh(geom, mat);
+    return mesh;
+}
+
 function createScene() {
     // set the scene size
-    var WIDTH = 1000,
-        HEIGHT = 440;
+    var WIDTH = 640,
+        HEIGHT = 360;
 
     // set camera attributes
-    var VIEW_ANGLE = 60,
+    var VIEW_ANGLE = 50,
         ASPECT = WIDTH / HEIGHT,
         NEAR = 0.1,
         FAR = 10000;
@@ -118,12 +139,12 @@ function createScene() {
         planeQuality = 10;
 
     // create the plane's material
-    var planeMaterial = new THREE.MeshLambertMaterial({color: 0x4BD121});
+    // var planeMaterial = new THREE.MeshLambertMaterial({color: 0x4BD121}); //TODO delete with next pull request if new surface merged
 
     // create the playing surface plane
-    var plane = new THREE.Mesh(
+    var plane = createMesh(
         new THREE.PlaneGeometry(planeWidth * 0.95, planeHeight, planeQuality, planeQuality),
-        planeMaterial
+        "surface.png"
     );
 
     scene.add(plane);
@@ -173,6 +194,22 @@ function createScene() {
     // lift paddles over playing surface
     paddle1.position.z = paddleDepth;
     paddle2.position.z = paddleDepth;
+
+    // skybox
+    var imagePrefix = "./textures/";
+    var directions  = ["xpos", "xneg", "ypos", "yneg", "zpos", "zneg"];
+    var imageSuffix = ".png";
+    var skyGeometry = new THREE.CubeGeometry( 1000, 1000, 1000 );
+
+    var materialArray = [];
+    for (var i = 0; i < 6; i++)
+        materialArray.push( new THREE.MeshBasicMaterial({
+            map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix  ),
+            side: THREE.BackSide
+        }));
+    var skyMaterial = new THREE.MeshFaceMaterial(materialArray);
+    var skyBox = new THREE.Mesh(skyGeometry, skyMaterial);
+    scene.add( skyBox );
 }
 
 function draw() {
@@ -246,9 +283,11 @@ function playerPaddleMovement() {
         if (paddle1.position.y < fieldHeight * 0.45) {
             paddle1DirY = paddleSpeed * 0.5;
         }
-        // else we do not move
+        // else we do not move and stretch the paddle
+        // to indicate we can't move
         else {
             paddle1DirY = 0;
+            paddle1.scale.z += (10 - paddle1.scale.z) * 0.2;
         }
     }
     // move right
@@ -258,15 +297,20 @@ function playerPaddleMovement() {
         if (paddle1.position.y > -fieldHeight * 0.45) {
             paddle1DirY = -paddleSpeed * 0.5;
         }
-        // else we do not move
+        // else we do not move and stretch the paddle
+        // to indicate we can't move
         else {
             paddle1DirY = 0;
+            paddle1.scale.z += (10 - paddle1.scale.z) * 0.2;
         }
     }
     // else don't move paddle
     else {
         paddle1DirY = 0;
     }
+
+    paddle1.scale.y += (1 - paddle1.scale.y) * 0.2;
+    paddle1.scale.z += (1 - paddle1.scale.z) * 0.2;
 
     paddle1.position.y += paddle1DirY;
 }
@@ -291,6 +335,11 @@ function opponentPaddleMovement() {
         }
     }
 
+    // we lerp the scale back to 1
+    // this is done because we stretch the paddle at some points
+    // stretching is done when paddle touches side of table and when paddle hits ball
+    // by doing this here, we ensure paddle always comes back to default size
+    paddle2.scale.y += (1 - paddle2.scale.y) * 0.2;
 }
 
 // Handles paddle collision logic
@@ -308,6 +357,11 @@ function paddlePhysics() {
             // ball is intersecting with the front half of the paddle
             // and if ball is travelling towards player (-ve direction)
             if (ballDirX < 0) {
+                // stretch the paddle to indicate a hit
+                paddle1.scale.y = 5;
+
+                // sound of hitting ball
+                snd.play();
 
                 // switch direction of ball travel to create bounce
                 ballDirX = -ballDirX;
@@ -333,6 +387,11 @@ function paddlePhysics() {
             // ball is intersecting with the front half of the paddle
             // and if ball is travelling towards opponent (+ve direction)
             if (ballDirX > 0) {
+                // stretch the paddle to indicate a hit
+                paddle2.scale.y = 5;
+
+                // sound of hitting ball
+                snd.play();
 
                 // switch direction of ball travel to create bounce
                 ballDirX = -ballDirX;
@@ -352,7 +411,7 @@ function cameraPhysics() {
     spotLight.position.y = ball.position.y;
 
     // move to behind the player's paddle
-    camera.position.x = paddle1.position.x - 80;
+    camera.position.x = paddle1.position.x - 100;
     camera.position.y += (paddle1.position.y - camera.position.y) * 0.05;
     camera.position.z = paddle1.position.z + 100 + 0.04 * (-ball.position.x + paddle1.position.x);
 
