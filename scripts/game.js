@@ -24,7 +24,7 @@ var score1 = 0,
     maxScore = 7;
 
 // hitting ball sound
-var snd = new Audio("./sounds/hittingBall.mp3");
+var hittingBallSound = new Audio("./sounds/hittingBall.mp3");
 
 // background music
 backgroundMusic = new Audio('./sounds/backgroundMusic.mp3');
@@ -33,6 +33,23 @@ backgroundMusic.addEventListener('ended', function() {
     this.play();
 }, false);
 backgroundMusic.play();
+
+// player win music
+playerWinMusic = new Audio('./sounds/playerWin.mp3');
+playerWinMusic.addEventListener('ended', function() {
+    this.currentTime = 0;
+    this.play();
+}, false);
+
+// player lose music
+playerLoseMusic = new Audio('./sounds/playerLose.mp3');
+playerLoseMusic.addEventListener('ended', function() {
+    this.currentTime = 0;
+    this.play();
+}, false);
+
+// clock
+var clock = new THREE.Clock();
 
 function setup() {
     document.getElementById("winnerBoard").innerHTML = "First to " + maxScore + "wins!";
@@ -56,11 +73,11 @@ function createMesh(geom, imageFile) {
 
 function createScene() {
     // set the scene size
-    var WIDTH = 640,
-        HEIGHT = 360;
+    var WIDTH = 1000,
+        HEIGHT = 440;
 
     // set camera attributes
-    var VIEW_ANGLE = 50,
+    var VIEW_ANGLE = 60,
         ASPECT = WIDTH / HEIGHT,
         NEAR = 0.1,
         FAR = 10000;
@@ -135,7 +152,7 @@ function createScene() {
     renderer.shadowMapEnabled = true;
 
     var planeWidth = fieldWidth,
-        planeHeight = fieldHeight,
+        planeHeight = fieldHeight + 16,
         planeQuality = 10;
 
     // create the plane's material
@@ -144,13 +161,50 @@ function createScene() {
     // create the playing surface plane
     var plane = createMesh(
         new THREE.PlaneGeometry(planeWidth * 0.95, planeHeight, planeQuality, planeQuality),
-        "surface.png"
+        "newSurface.png"
     );
 
     scene.add(plane);
 
     plane.receiveShadow = true;
     plane.castShadow = true;
+
+    // set up the wall vars
+    wallWidth = fieldWidth * 0.95;
+    wallHeight = 3;
+    wallDepth = 20;
+    wallQuality = 1;
+
+    var wallMaterial = new THREE.MeshLambertMaterial({color: 0x1B32D0});
+
+    // right wall
+    rightWall = createMesh(
+        new THREE.CubeGeometry(wallWidth, wallHeight, wallDepth, wallQuality, wallQuality, wallQuality),
+        "portugal.png"
+    );
+
+    scene.add(rightWall);
+
+    rightWall.receiveShadow = true;
+    rightWall.castShadow = true;
+
+    rightWall.position.x = fieldHeight/1000;
+    rightWall.position.y = -fieldHeight/2 - 8;
+    rightWall.position.z = wallDepth/2;
+
+    // left wall
+    leftWall = createMesh(
+        new THREE.CubeGeometry(wallWidth, wallHeight, wallDepth, wallQuality, wallQuality, wallQuality),
+        "poland.png"
+    );
+
+    scene.add(leftWall);
+    leftWall.receiveShadow = true;
+    leftWall.castShadow = true;
+
+    leftWall.position.x = fieldHeight/1000;
+    leftWall.position.y = fieldHeight/2 + 8;
+    leftWall.position.z = wallDepth/2;
 
     // set up the paddle vars
     paddleWidth = 10;
@@ -210,11 +264,22 @@ function createScene() {
     var skyMaterial = new THREE.MeshFaceMaterial(materialArray);
     var skyBox = new THREE.Mesh(skyGeometry, skyMaterial);
     scene.add( skyBox );
+
+    // fountain of player win
+    this.fountainPlayerWin = new ParticleEngine();
+    fountainPlayerWin.setValues( Examples.rain );
+    fountainPlayerWin.initialize();
 }
 
 function draw() {
     // draw THREE.JS scene
     renderer.render(scene, camera);
+
+    // update fountain of player win
+    if (score1 >= maxScore) {
+        var dt = clock.getDelta();
+        fountainPlayerWin.update( dt * 0.5 );
+    }
 
     // loop the draw() function
     requestAnimationFrame(draw);
@@ -283,11 +348,9 @@ function playerPaddleMovement() {
         if (paddle1.position.y < fieldHeight * 0.45) {
             paddle1DirY = paddleSpeed * 0.5;
         }
-        // else we do not move and stretch the paddle
-        // to indicate we can't move
+        // else we do not move
         else {
             paddle1DirY = 0;
-            paddle1.scale.z += (10 - paddle1.scale.z) * 0.2;
         }
     }
     // move right
@@ -297,20 +360,15 @@ function playerPaddleMovement() {
         if (paddle1.position.y > -fieldHeight * 0.45) {
             paddle1DirY = -paddleSpeed * 0.5;
         }
-        // else we do not move and stretch the paddle
-        // to indicate we can't move
+        // else we do not move
         else {
             paddle1DirY = 0;
-            paddle1.scale.z += (10 - paddle1.scale.z) * 0.2;
         }
     }
     // else don't move paddle
     else {
         paddle1DirY = 0;
     }
-
-    paddle1.scale.y += (1 - paddle1.scale.y) * 0.2;
-    paddle1.scale.z += (1 - paddle1.scale.z) * 0.2;
 
     paddle1.position.y += paddle1DirY;
 }
@@ -335,11 +393,6 @@ function opponentPaddleMovement() {
         }
     }
 
-    // we lerp the scale back to 1
-    // this is done because we stretch the paddle at some points
-    // stretching is done when paddle touches side of table and when paddle hits ball
-    // by doing this here, we ensure paddle always comes back to default size
-    paddle2.scale.y += (1 - paddle2.scale.y) * 0.2;
 }
 
 // Handles paddle collision logic
@@ -357,11 +410,9 @@ function paddlePhysics() {
             // ball is intersecting with the front half of the paddle
             // and if ball is travelling towards player (-ve direction)
             if (ballDirX < 0) {
-                // stretch the paddle to indicate a hit
-                paddle1.scale.y = 5;
 
                 // sound of hitting ball
-                snd.play();
+                hittingBallSound.play();
 
                 // switch direction of ball travel to create bounce
                 ballDirX = -ballDirX;
@@ -387,11 +438,9 @@ function paddlePhysics() {
             // ball is intersecting with the front half of the paddle
             // and if ball is travelling towards opponent (+ve direction)
             if (ballDirX > 0) {
-                // stretch the paddle to indicate a hit
-                paddle2.scale.y = 5;
 
                 // sound of hitting ball
-                snd.play();
+                hittingBallSound.play();
 
                 // switch direction of ball travel to create bounce
                 ballDirX = -ballDirX;
@@ -411,7 +460,7 @@ function cameraPhysics() {
     spotLight.position.y = ball.position.y;
 
     // move to behind the player's paddle
-    camera.position.x = paddle1.position.x - 100;
+    camera.position.x = paddle1.position.x - 80;
     camera.position.y += (paddle1.position.y - camera.position.y) * 0.05;
     camera.position.z = paddle1.position.z + 100 + 0.04 * (-ball.position.x + paddle1.position.x);
 
@@ -445,6 +494,11 @@ function resetBall(loser) {
 function matchScoreCheck() {
     // if player has 7 points
     if (score1 >= maxScore) {
+        // stop backgroung music and play victory anthem
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+        playerWinMusic.play();
+
         // stop the ball
         ballSpeed = 0;
         // write to the banner
@@ -453,6 +507,15 @@ function matchScoreCheck() {
     }
     // else if opponent has 7 points
     else if (score2 >= maxScore) {
+        // stop backgroung music and play victory anthem
+        backgroundMusic.pause();
+        backgroundMusic.currentTime = 0;
+        playerLoseMusic.play();
+
+        // sound of silence and black screen when we lose
+        var c = document.getElementById("gameCanvas");
+        c.style.display="none";
+
         // stop the ball
         ballSpeed = 0;
         // write to the banner
