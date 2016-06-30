@@ -1,5 +1,5 @@
 
-var renderer, scene, camera, pointLight, spotLight;
+var renderer, scene, camera, spotLight1, spotLight2, spotLight3, spotLight4, opponentLight;
 
 // field variables
 var fieldWidth = 400,
@@ -9,7 +9,8 @@ var fieldWidth = 400,
 var paddleWidth, paddleHeight, paddleDepth, paddleQuality, paddle1, paddle2;
 var paddle1DirY = 0,
     paddle2DirY = 0,
-    paddleSpeed = 3;
+    paddleSpeed = 3,
+    opponentPaddleSpeed = 3;
 
 // ball variables
 var ball;
@@ -48,6 +49,9 @@ playerLoseMusic.addEventListener('ended', function() {
     this.play();
 }, false);
 
+// player goal sound
+var playerGoalSound = new Audio("./sounds/playerGoal.mp3");
+
 // clock
 var clock = new THREE.Clock();
 
@@ -63,17 +67,16 @@ function setup() {
 
 
 function createMesh(geom, imageFile) {
-    var texture = THREE.ImageUtils.loadTexture("textures/" + imageFile)
+    var texture = THREE.ImageUtils.loadTexture("textures/" + imageFile);
     var mat = new THREE.MeshPhongMaterial();
     mat.map = texture;
 
-    var mesh = new THREE.Mesh(geom, mat);
-    return mesh;
+    return new THREE.Mesh(geom, mat);
 }
 
 function createScene() {
     // set the scene size
-    var WIDTH = 1000,
+    var WIDTH = 1200,
         HEIGHT = 440;
 
     // set camera attributes
@@ -108,13 +111,9 @@ function createScene() {
         segments = 6,
         rings = 6;
 
-    // create the sphere's material
-    var sphereMaterial = new THREE.MeshLambertMaterial({color: 0xD43001});
-
-    // Create a ball with sphere geometry
-    ball = new THREE.Mesh(
+    ball = createMesh(
         new THREE.SphereGeometry(radius, segments, rings),
-        sphereMaterial
+        "ball.png"
     );
 
     // add the sphere to the scene
@@ -128,26 +127,39 @@ function createScene() {
     ball.receiveShadow = true;
     ball.castShadow = true;
 
-    // create a point light
-    pointLight = new THREE.PointLight(0xF8D898);
-
-    // set its position
-    pointLight.position.x = -1000;
-    pointLight.position.y = 0;
-    pointLight.position.z = 1000;
-    pointLight.intensity = 2.9;
-    pointLight.distance = 10000;
-
-    // add to the scene
-    scene.add(pointLight);
-
-    // add a spot light
+    // add a spot lights
     // this is important for casting shadows
-    spotLight = new THREE.SpotLight(0xF8D898);
-    spotLight.position.set(0, 0, 460);
-    spotLight.intensity = 1.5;
-    spotLight.castShadow = true;
-    scene.add(spotLight);
+    var lightsOffset = 320;
+    var lightsHeight = 440;
+    var lightsAngle = 0.3;
+    var lightsDistance = 1000;
+    var lightsColor = 0xffffff;
+    var lightsIntensity = 3.5;
+    var lightsPenumbra = 0.1;
+
+    spotLight1 = new THREE.SpotLight(lightsColor, lightsIntensity, lightsDistance, lightsAngle, lightsPenumbra);
+    spotLight1.position.set(fieldWidth/2 + lightsOffset, fieldHeight/2 + lightsOffset, lightsHeight);
+    spotLight1.castShadow = true;
+    scene.add(spotLight1);
+
+    spotLight2 = new THREE.SpotLight(lightsColor, lightsIntensity, lightsDistance, lightsAngle, lightsPenumbra);
+    spotLight2.position.set(fieldWidth/2 + lightsOffset, -fieldHeight/2 - lightsOffset, lightsHeight);
+    spotLight2.castShadow = true;
+    scene.add(spotLight2);
+
+    spotLight3 = new THREE.SpotLight(lightsColor, lightsIntensity, lightsDistance, lightsAngle, lightsPenumbra);
+    spotLight3.position.set(-fieldWidth/2 - lightsOffset, fieldHeight/2 + lightsOffset, lightsHeight);
+    spotLight3.castShadow = true;
+    scene.add(spotLight3);
+
+    spotLight4 = new THREE.SpotLight(lightsColor, lightsIntensity, lightsDistance, lightsAngle, lightsPenumbra);
+    spotLight4.position.set(-fieldWidth/2 - lightsOffset, -fieldHeight/2 - lightsOffset, lightsHeight);
+    spotLight4.castShadow = true;
+    scene.add(spotLight4);
+
+    opponentLight = new THREE.PointLight( 0xffffff, 3.0, 40 );
+    opponentLight.position.set( fieldWidth/2 - 30, 0, 10 );
+    scene.add( opponentLight );
 
     renderer.shadowMapEnabled = true;
 
@@ -155,13 +167,10 @@ function createScene() {
         planeHeight = fieldHeight + 16,
         planeQuality = 10;
 
-    // create the plane's material
-    // var planeMaterial = new THREE.MeshLambertMaterial({color: 0x4BD121}); //TODO delete with next pull request if new surface merged
-
     // create the playing surface plane
     var plane = createMesh(
         new THREE.PlaneGeometry(planeWidth * 0.95, planeHeight, planeQuality, planeQuality),
-        "newSurface.png"
+        "football_pitch.png"
     );
 
     scene.add(plane);
@@ -170,17 +179,15 @@ function createScene() {
     plane.castShadow = true;
 
     // set up the wall vars
-    wallWidth = fieldWidth * 0.95;
-    wallHeight = 3;
-    wallDepth = 20;
-    wallQuality = 1;
-
-    var wallMaterial = new THREE.MeshLambertMaterial({color: 0x1B32D0});
+    var wallWidth = fieldWidth * 0.95;
+    var wallHeight = 3;
+    var wallDepth = 20;
+    var wallQuality = 1;
 
     // right wall
-    rightWall = createMesh(
+    var rightWall = createMesh(
         new THREE.CubeGeometry(wallWidth, wallHeight, wallDepth, wallQuality, wallQuality, wallQuality),
-        "portugal.png"
+        "portugalWall.png"
     );
 
     scene.add(rightWall);
@@ -193,9 +200,9 @@ function createScene() {
     rightWall.position.z = wallDepth/2;
 
     // left wall
-    leftWall = createMesh(
+    var leftWall = createMesh(
         new THREE.CubeGeometry(wallWidth, wallHeight, wallDepth, wallQuality, wallQuality, wallQuality),
-        "poland.png"
+        "polandWall.png"
     );
 
     scene.add(leftWall);
@@ -212,15 +219,9 @@ function createScene() {
     paddleDepth = 10;
     paddleQuality = 1;
 
-    // create the paddle1's material
-    var paddle1Material = new THREE.MeshLambertMaterial({color: 0x1B32C0});
-    // create the paddle2's material
-    var paddle2Material = new THREE.MeshLambertMaterial({color: 0xFF4045});
-
-    // set up paddle 1
-    paddle1 = new THREE.Mesh(
+    paddle1 = createMesh(
         new THREE.CubeGeometry(paddleWidth, paddleHeight, paddleDepth, paddleQuality, paddleQuality, paddleQuality),
-        paddle1Material
+        "poland.png"
     );
 
     // add the padle to the scene
@@ -229,13 +230,12 @@ function createScene() {
     paddle1.receiveShadow = true;
     paddle1.castShadow = true;
 
-    // set up paddle 2
-    paddle2 = new THREE.Mesh(
+    paddle2 = createMesh(
         new THREE.CubeGeometry(paddleWidth, paddleHeight, paddleDepth, paddleQuality, paddleQuality, paddleQuality),
-        paddle2Material
+        "portugal.png"
     );
 
-    // add the second padle to the scene
+    // add the second paddle to the scene
     scene.add(paddle2);
 
     paddle2.receiveShadow = true;
@@ -297,6 +297,8 @@ function ballPhysics() {
     if (ball.position.x <= -fieldWidth/2) {
         // CPU scores
         score2++;
+        difficulty -= 0.1;
+        opponentPaddleSpeed -= 1;
         // update scoreboard
         document.getElementById("scores").innerHTML = score1 + "-" + score2;
         // reset ball
@@ -306,8 +308,12 @@ function ballPhysics() {
     }
     // if ball goes off the 'right' side (CPU's side)
     if (ball.position.x >= fieldWidth/2) {
+        // goal sound
+        playerGoalSound.play();
         // Player scores
         score1++;
+        difficulty += 0.2;
+        opponentPaddleSpeed += 1;
         // update scoreboard
         document.getElementById("scores").innerHTML = score1 + "-" + score2;
         // reset ball
@@ -329,6 +335,9 @@ function ballPhysics() {
     // update ball position over time
     ball.position.x += ballDirX * ballSpeed;
     ball.position.y += ballDirY * ballSpeed;
+
+    ball.rotation.x += ballDirX * ballSpeed;
+    ball.rotation.y += ballDirY * ballSpeed;
 
     // limit ball's y-speed to 2x the x-speed
     // this is so the ball doesn't speed from left to right super fast
@@ -378,18 +387,18 @@ function opponentPaddleMovement() {
     paddle2DirY = (ball.position.y - paddle2.position.y) * difficulty;
 
     // in case the Lerp function produces a value above max paddle speed, we clamp it
-    if (Math.abs(paddle2DirY) <= paddleSpeed) {
+    if (Math.abs(paddle2DirY) <= opponentPaddleSpeed) {
         paddle2.position.y += paddle2DirY;
     }
-    // if the lerp value is too high, we have to limit speed to paddleSpeed
+    // if the lerp value is too high, we have to limit speed to opponentPaddleSpeed
     else {
         // if paddle is lerping in +ve direction
-        if (paddle2DirY > paddleSpeed) {
-            paddle2.position.y += paddleSpeed;
+        if (paddle2DirY > opponentPaddleSpeed) {
+            paddle2.position.y += opponentPaddleSpeed;
         }
         // if paddle is lerping in -ve direction
-        else if (paddle2DirY < -paddleSpeed) {
-            paddle2.position.y -= paddleSpeed;
+        else if (paddle2DirY < -opponentPaddleSpeed) {
+            paddle2.position.y -= opponentPaddleSpeed;
         }
     }
 
@@ -420,7 +429,8 @@ function paddlePhysics() {
                 // we impact ball angle when hitting it
                 // this is not realistic physics, just spices up the gameplay
                 // allows you to 'slice' the ball to beat the opponent
-                ballDirY -= paddle1DirY * 0.7;
+                // ballDirY -= paddle1DirY * 0.7;
+                ballDirY -= (paddle1.position.y - ball.position.y) * 0.1;
             }
         }
     }
@@ -456,8 +466,9 @@ function paddlePhysics() {
 
 function cameraPhysics() {
     // we can easily notice shadows if we dynamically move lights during the game
-    spotLight.position.x = ball.position.x;
-    spotLight.position.y = ball.position.y;
+    // spotLight.position.x = ball.position.x;
+    // spotLight.position.y = ball.position.y;
+    opponentLight.position.y = paddle2.position.y;
 
     // move to behind the player's paddle
     camera.position.x = paddle1.position.x - 80;
